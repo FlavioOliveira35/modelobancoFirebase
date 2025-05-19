@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUD Pessoas com Firebase</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/_@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .hidden {
+            display: none;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f9fafb;
+            padding: 20px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="card">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">CRUD de Pessoas com Firebase</h1>
+            
+            <!-- Formulário para adicionar/editar pessoas -->
+            <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h2 id="formTitle" class="text-xl font-semibold mb-4">Cadastrar Nova Pessoa</h2>
+                <form id="pessoaForm">
+                    <input type="hidden" id="pessoaId">
+                    <div class="mb-4">
+                        <label for="nome" class="block text-gray-700 mb-2">Nome:</label>
+                        <input type="text" id="nome" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="idade" class="block text-gray-700 mb-2">Idade:</label>
+                        <input type="number" id="idade" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required min="0" max="120">
+                    </div>
+                    <div class="flex justify-between">
+                        <button type="submit" id="saveBtn" class="btn bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            Salvar
+                        </button>
+                        <button type="button" id="cancelBtn" class="btn bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 hidden">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Tabela de pessoas -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold mb-4">Lista de Pessoas</h2>
+                <div class="table-container">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                                <th class="py-3 px-6 text-left">Nome</th>
+                                <th class="py-3 px-6 text-left">Idade</th>
+                                <th class="py-3 px-6 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pessoasTable">
+                            <!-- Os dados serão inseridos aqui via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="emptyMessage" class="text-center text-gray-500 py-4 hidden">
+                    Nenhuma pessoa cadastrada ainda.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script>
+        // Configuração do Firebase - Substitua com suas próprias configurações
+        const firebaseConfig = {
+            apiKey: "SUA_API_KEY",
+            authDomain: "SEU_AUTH_DOMAIN",
+            projectId: "SEU_PROJECT_ID",
+            storageBucket: "SEU_STORAGE_BUCKET",
+            messagingSenderId: "SEU_MESSAGING_SENDER_ID",
+            appId: "SEU_APP_ID"
+        };
+        
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const pessoasRef = db.collection('pessoas');
+
+        // Elementos do DOM
+        const pessoaForm = document.getElementById('pessoaForm');
+        const formTitle = document.getElementById('formTitle');
+        const pessoaId = document.getElementById('pessoaId');
+        const nomeInput = document.getElementById('nome');
+        const idadeInput = document.getElementById('idade');
+        const saveBtn = document.getElementById('saveBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const pessoasTable = document.getElementById('pessoasTable');
+        const emptyMessage = document.getElementById('emptyMessage');
+
+        // Carregar pessoas do Firebase
+        function loadPessoas() {
+            pessoasTable.innerHTML = '';
+            
+            pessoasRef.get().then((snapshot) => {
+                if (snapshot.empty) {
+                    emptyMessage.classList.remove('hidden');
+                    return;
+                }
+                
+                emptyMessage.classList.add('hidden');
+                
+                snapshot.forEach((doc) => {
+                    const pessoa = doc.data();
+                    const id = doc.id;
+                    
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-200 hover:bg-gray-100';
+                    
+                    row.innerHTML = `
+                        <td class="py-3 px-6 text-left">${pessoa.nome}</td>
+                        <td class="py-3 px-6 text-left">${pessoa.idade}</td>
+                        <td class="py-3 px-6 text-center">
+                            <div class="flex item-center justify-center">
+                                <button class="edit-btn transform hover:text-blue-500 hover:scale-110 mr-4" data-id="${id}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="delete-btn transform hover:text-red-500 hover:scale-110" data-id="${id}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    
+                    pessoasTable.appendChild(row);
+                });
+                
+                // Adicionar event listeners aos botões de edição e exclusão
+                document.querySelectorAll('.edit-btn').forEach(btn => {
+                    btn.addEventListener('click', editPessoa);
+                });
+                
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', deletePessoa);
+                });
+            }).catch((error) => {
+                console.error("Erro ao carregar pessoas: ", error);
+                alert("Erro ao carregar pessoas: " + error.message);
+            });
+        }
+
+        // Adicionar ou atualizar pessoa
+        pessoaForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const nome = nomeInput.value.trim();
+            const idade = parseInt(idadeInput.value);
+            
+            if (!nome) {
+                alert('Por favor, preencha o nome.');
+                return;
+            }
+            
+            const pessoa = {
+                nome: nome,
+                idade: idade
+            };
+            
+            const id = pessoaId.value;
+            
+            if (id) {
+                // Atualizar pessoa existente
+                pessoasRef.doc(id).update(pessoa)
+                    .then(() => {
+                        console.log("Pessoa atualizada com sucesso!");
+                        resetForm();
+                        loadPessoas();
+                    })
+                    .catch((error) => {
+                        console.error("Erro ao atualizar pessoa: ", error);
+                        alert("Erro ao atualizar pessoa: " + error.message);
+                    });
+            } else {
+                // Adicionar nova pessoa
+                pessoasRef.add(pessoa)
+                    .then(() => {
+                        console.log("Pessoa adicionada com sucesso!");
+                        resetForm();
+                        loadPessoas();
+                    })
+                    .catch((error) => {
+                        console.error("Erro ao adicionar pessoa: ", error);
+                        alert("Erro ao adicionar pessoa: " + error.message);
+                    });
+            }
+        });
+
+        // Editar pessoa
+        function editPessoa(e) {
+            const id = e.currentTarget.getAttribute('data-id');
+            
+            pessoasRef.doc(id).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const pessoa = doc.data();
+                        
+                        // Preencher formulário com os dados da pessoa
+                        pessoaId.value = id;
+                        nomeInput.value = pessoa.nome;
+                        idadeInput.value = pessoa.idade;
+                        
+                        // Mudar título e mostrar botão de cancelar
+                        formTitle.textContent = 'Editar Pessoa';
+                        cancelBtn.classList.remove('hidden');
+                    } else {
+                        console.log("Documento não encontrado!");
+                        alert("Documento não encontrado!");
+                    }
+                })
+                .catch((error) => {
+                    console.error("Erro ao buscar pessoa: ", error);
+                    alert("Erro ao buscar pessoa: " + error.message);
+                });
+        }
+
+        // Deletar pessoa
+        function deletePessoa(e) {
+            if (confirm('Tem certeza que deseja excluir esta pessoa?')) {
+                const id = e.currentTarget.getAttribute('data-id');
+                
+                pessoasRef.doc(id).delete()
+                    .then(() => {
+                        console.log("Pessoa excluída com sucesso!");
+                        loadPessoas();
+                    })
+                    .catch((error) => {
+                        console.error("Erro ao excluir pessoa: ", error);
+                        alert("Erro ao excluir pessoa: " + error.message);
+                    });
+            }
+        }
+
+        // Resetar formulário
+        function resetForm() {
+            pessoaForm.reset();
+            pessoaId.value = '';
+            formTitle.textContent = 'Cadastrar Nova Pessoa';
+            cancelBtn.classList.add('hidden');
+        }
+
+        // Cancelar edição
+        cancelBtn.addEventListener('click', resetForm);
+
+        // Inicializar a aplicação
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPessoas();
+        });
+    </script>
+</body>
+</html>
+
